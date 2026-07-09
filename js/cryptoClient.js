@@ -36,7 +36,11 @@ async function deriveKeyOffline(userSalt, serverPepper) {
     ['deriveKey']
   );
 
-  const saltBuffer = hexToArrayBuffer(userSalt);
+  // En Node.js: pbkdf2Sync(SERVER_PEPPER, userSalt, 10000, 32, 'sha256')
+  // Nota crucial: en el backend pasamos 'userSalt' directamente como string (hexadecimal de 64 caracteres)
+  // por lo tanto, no debemos decodificar el hex en bytes binarios, sino codificar los caracteres UTF-8
+  // del string tal cual para que coincida exactamente con la derivación de clave de Node.js.
+  const saltBuffer = encoder.encode(userSalt);
 
   const cryptoKey = await window.crypto.subtle.deriveKey(
     {
