@@ -171,17 +171,59 @@ function renderCategories() {
     const chip = document.createElement('div');
     chip.className = `category-chip ${selectedCategoryId === cat.id_clasificacion ? 'active' : ''}`;
     chip.style.borderColor = cat.color;
+    
+    // Si la categoría pertenece al usuario (no es global), añadir botón de eliminar
+    const isCustom = cat.id_usuario !== null;
+    
     chip.innerHTML = `
-      <i class="ri-${cat.icono || 'folder-line'}" style="color: ${cat.color}"></i>
-      <span>${cat.nombre}</span>
+      <div class="category-chip-content" style="display: flex; align-items: center; gap: 6px;">
+        <i class="ri-${cat.icono || 'folder-line'}" style="color: ${cat.color}"></i>
+        <span>${cat.nombre}</span>
+      </div>
+      ${isCustom ? `<button class="btn-delete-cat" data-id="${cat.id_clasificacion}" title="Eliminar categoría" style="background: none; border: none; padding: 2px; cursor: pointer; color: var(--text-muted); display: inline-flex; align-items: center; margin-left: 4px; font-size: 1rem;"><i class="ri-close-line"></i></button>` : ''}
     `;
-    chip.addEventListener('click', () => {
+
+    // Evento de click principal en el chip de categoría
+    chip.querySelector('.category-chip-content').addEventListener('click', () => {
       selectedCategoryId = cat.id_clasificacion;
       renderCategories();
       filterAndRenderAccounts();
     });
+
+    // Evento de click para eliminar la categoría
+    if (isCustom) {
+      chip.querySelector('.btn-delete-cat').addEventListener('click', async (e) => {
+        e.stopPropagation(); // Evitar cambiar de filtro al presionar borrar
+        if (confirm(`¿Estás seguro de eliminar la categoría "${cat.nombre}"? Las relaciones con las cuentas se removerán.`)) {
+          await deleteCategory(cat.id_clasificacion);
+        }
+      });
+    }
+
     categoriesListEl.appendChild(chip);
   });
+}
+
+// Eliminar categoría
+async function deleteCategory(id) {
+  try {
+    const { error } = await window.sb
+      .from('clasificacion')
+      .delete()
+      .eq('id_clasificacion', id);
+
+    if (error) throw error;
+
+    showToast('Categoría eliminada.');
+    if (selectedCategoryId === id) {
+      selectedCategoryId = null;
+    }
+    await fetchCategories();
+    // Refrescar las cuentas para limpiar las clasificaciones removidas
+    await fetchAccounts();
+  } catch (err) {
+    showToast(err.message || 'No se pudo eliminar la categoría.');
+  }
 }
 
 // Cargar categorías dentro del modal de Cuentas (Checkboxes)

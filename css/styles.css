@@ -369,6 +369,15 @@ input, button, textarea {
   color: white;
 }
 
+.btn-delete-cat {
+  transition: var(--transition-smooth);
+}
+
+.btn-delete-cat:hover {
+  color: var(--accent-danger) !important;
+  transform: scale(1.2);
+}
+
 /* Action Bar */
 .action-bar {
   display: flex;

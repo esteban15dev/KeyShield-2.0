@@ -72,9 +72,13 @@ registerForm.addEventListener('submit', async (e) => {
 
     if (error) throw error;
 
-    showToast('¡Registro exitoso! Ya puedes iniciar sesión.');
+    // Mostrar pantalla de confirmación clara para verificación de correo
+    document.getElementById('confirm-email-display').textContent = email;
+    registerForm.classList.add('hidden');
+    document.getElementById('email-confirm-screen').classList.remove('hidden');
+    document.getElementById('auth-subtitle').textContent = 'Verifica tu cuenta';
+    
     registerForm.reset();
-    toLoginLink.click();
   } catch (error) {
     showToast(error.message || 'Error en el registro');
   }
@@ -105,17 +109,63 @@ loginForm.addEventListener('submit', async (e) => {
   }
 });
 
+// Botón de retorno al registro desde confirmación
+document.getElementById('btn-back-to-register').addEventListener('click', () => {
+  document.getElementById('email-confirm-screen').classList.add('hidden');
+  registerForm.classList.remove('hidden');
+  document.getElementById('auth-subtitle').textContent = 'Crea tu cuenta de almacenamiento cifrado';
+});
+
 // Cierre de Sesión
-document.getElementById('btn-logout').addEventListener('click', async () => {
+const logoutAction = async () => {
   try {
     await window.sb.auth.signOut();
     sessionStorage.removeItem('keyshield_master');
+    document.getElementById('reauth-modal').classList.add('hidden');
     if (window.offlineDB) {
       await window.offlineDB.clearOfflineData();
     }
     showToast('Sesión cerrada.');
   } catch (err) {
     console.error('Error al cerrar sesión:', err);
+  }
+};
+
+document.getElementById('btn-logout').addEventListener('click', logoutAction);
+document.getElementById('btn-reauth-logout').addEventListener('click', logoutAction);
+
+// Manejo del formulario de re-autenticación rápida
+document.getElementById('reauth-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const password = document.getElementById('reauth-password').value;
+
+  try {
+    // Validar la contraseña maestra localmente intentando hacer login de nuevo contra Supabase
+    const { data: { session } } = await window.sb.auth.getSession();
+    if (!session || !session.user) {
+      throw new Error('No hay sesión de Supabase activa. Inicie sesión de nuevo.');
+    }
+
+    const { error } = await window.sb.auth.signInWithPassword({
+      email: session.user.email,
+      password: password
+    });
+
+    if (error) throw new Error('Contraseña incorrecta.');
+
+    // Contraseña válida, guardar en sessionStorage
+    sessionStorage.setItem('keyshield_master', password);
+    document.getElementById('reauth-password').value = '';
+    document.getElementById('reauth-modal').classList.add('hidden');
+    
+    showToast('Contraseña maestra cargada con éxito.');
+    
+    // Inicializar dashboard
+    if (window.initializeDashboard) {
+      window.initializeDashboard();
+    }
+  } catch (err) {
+    showToast(err.message || 'Contraseña incorrecta.');
   }
 });
 
@@ -124,19 +174,29 @@ async function checkAuth() {
   const { data: { session } } = await window.sb.auth.getSession();
   
   if (session && session.user) {
+    // Ocultar Auth Container y mostrar App Container
     authContainer.classList.add('hidden');
     appContainer.classList.remove('hidden');
     
     const userMetadata = session.user.user_metadata || {};
     document.getElementById('user-display').textContent = userMetadata.nombre_usuario || session.user.email;
     
-    // Disparar carga del dashboard en app.js
-    if (window.initializeDashboard) {
-      window.initializeDashboard();
+    // Verificar si la contraseña maestra se perdió en sessionStorage (pestaña recargada, app cerrada)
+    const masterPassword = sessionStorage.getItem('keyshield_master');
+    if (!masterPassword) {
+      // Mostrar el modal de re-autenticación rápida
+      document.getElementById('reauth-modal').classList.remove('hidden');
+    } else {
+      // Todo listo, disparar dashboard
+      if (window.initializeDashboard) {
+        window.initializeDashboard();
+      }
     }
   } else {
     appContainer.classList.add('hidden');
     authContainer.classList.remove('hidden');
+    // Asegurar ocultamiento de pantallas adicionales
+    document.getElementById('email-confirm-screen').classList.add('hidden');
   }
 }
 

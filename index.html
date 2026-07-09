@@ -103,6 +103,21 @@
 
         <p class="auth-switch">¿Ya tienes cuenta? <a href="#" id="to-login">Inicia Sesión</a></p>
       </form>
+
+      <!-- Pantalla de Confirmación de Email -->
+      <div id="email-confirm-screen" class="auth-form hidden" style="text-align: center; padding: 20px 10px;">
+        <div style="margin-bottom: 20px; font-size: 3rem; color: var(--accent-success, #10b981);">
+          <i class="ri-mail-send-line"></i>
+        </div>
+        <h3 style="margin-bottom: 10px; font-size: 1.25rem; font-weight: 600;">¡Revisa tu bandeja de entrada!</h3>
+        <p style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px;">
+          Hemos enviado un correo de verificación a <strong id="confirm-email-display" style="color: var(--text-color);"></strong>. Abre ese correo y haz clic en el enlace de confirmación para activar tu cuenta.
+        </p>
+        <button id="btn-back-to-register" class="btn btn-secondary-outline btn-block">
+          <i class="ri-arrow-left-line"></i>
+          <span>Volver al registro</span>
+        </button>
+      </div>
     </div>
   </main>
 
@@ -272,6 +287,35 @@
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary btn-close-cat-modal">Cancelar</button>
           <button type="submit" class="btn btn-success">Crear</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: RE-AUTENTICACIÓN RÁPIDA ================= -->
+  <div id="reauth-modal" class="modal hidden">
+    <div class="modal-content modal-content-sm">
+      <div class="modal-header">
+        <h3>Bienvenido de vuelta</h3>
+      </div>
+      <form id="reauth-form" class="modal-form">
+        <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 15px;">
+          Por seguridad, confirma tu contraseña maestra para descifrar tus credenciales.
+        </p>
+        <div class="input-group">
+          <label for="reauth-password">Contraseña Maestra</label>
+          <div class="input-wrapper">
+            <i class="ri-lock-2-line"></i>
+            <input type="password" id="reauth-password" placeholder="••••••••••••" required autocomplete="current-password">
+            <button type="button" class="btn-auth-eye" data-target="reauth-password" title="Mostrar contraseña">
+              <i class="ri-eye-line"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="modal-actions" style="flex-direction: column; gap: 8px;">
+          <button type="submit" class="btn btn-primary btn-block">Confirmar y Continuar</button>
+          <button type="button" id="btn-reauth-logout" class="btn btn-secondary-outline btn-block">Cerrar Sesión</button>
         </div>
       </form>
     </div>
