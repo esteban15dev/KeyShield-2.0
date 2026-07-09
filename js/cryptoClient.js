@@ -25,12 +25,15 @@ function stringToArrayBuffer(str) {
  */
 async function deriveKeyOffline(userSalt, serverPepper) {
   const encoder = new TextEncoder();
+  
+  // En Node.js: pbkdf2Sync(SERVER_PEPPER, userSalt, 10000, 32, 'sha256')
+  // Por lo tanto, el password de PBKDF2 es el SERVER_PEPPER (serverPepper), y la sal es userSalt.
   const baseKey = await window.crypto.subtle.importKey(
     'raw',
     encoder.encode(serverPepper),
     { name: 'PBKDF2' },
     false,
-    ['deriveBits', 'deriveKey']
+    ['deriveKey']
   );
 
   const saltBuffer = hexToArrayBuffer(userSalt);
