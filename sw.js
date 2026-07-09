@@ -1,4 +1,4 @@
-const CACHE_NAME = 'keyshield-cache-v4';
+const CACHE_NAME = 'keyshield-cache-v5';
 const ASSETS_TO_CACHE = [
   './',
   'index.html',
@@ -8,15 +8,17 @@ const ASSETS_TO_CACHE = [
   'js/app.js',
   'js/offlineDB.js',
   'js/cryptoClient.js',
+  'js/supabaseClient.js',
   'manifest.json',
   'icons/icon-192x192.png',
   'icons/icon-512x512.png'
 ];
 
-// URLs externas que también queremos cachear (fuentes, iconos)
+// URLs externas que también queremos cachear (fuentes, iconos, SDK Supabase)
 const EXTERNAL_URLS_TO_CACHE = [
   'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap',
-  'https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css'
+  'https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css',
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js'
 ];
 
 // Evento de instalación: guardar recursos estáticos básicos en caché
@@ -67,8 +69,9 @@ self.addEventListener('fetch', (event) => {
 
   const requestUrl = new URL(event.request.url);
 
-  // Si es una petición a la API, usar Network Only (no cachear respuestas de API)
-  if (requestUrl.pathname.startsWith('/api/')) {
+  // Si es una petición hacia la base de datos Supabase (comunicación API de Supabase),
+  // usar Network Only (no cachear respuestas de datos dinámicos)
+  if (requestUrl.host.includes('supabase.co')) {
     return;
   }
 

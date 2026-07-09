@@ -1,5 +1,5 @@
-// Utilidades de descifrado en el navegador usando la Web Crypto API
-// Esto nos permite desencriptar las contraseñas localmente en la PWA sin enviar peticiones al servidor.
+// Utilidades de cifrado y descifrado en el navegador usando la Web Crypto API
+// Permite procesar las contraseñas localmente de manera segura sin intermediación del servidor.
 
 /**
  * Convierte un String hexadecimal a un ArrayBuffer de bytes
@@ -12,64 +12,93 @@ function hexToArrayBuffer(hex) {
 }
 
 /**
- * Convierte un String de texto ordinario a ArrayBuffer
+ * Convierte un ArrayBuffer de bytes a String hexadecimal
  */
-function stringToArrayBuffer(str) {
-  const encoder = new TextEncoder();
-  return encoder.encode(str);
+function arrayBufferToHex(buffer) {
+  return Array.from(new Uint8Array(buffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 /**
- * Deriva la clave criptográfica AES de 256 bits a partir del Salt del usuario y el Pepper
- * Empleando el algoritmo estándar PBKDF2 (10,000 iteraciones, SHA-256) idéntico al backend
+ * Deriva la clave criptográfica AES de 256 bits a partir de la contraseña maestra y el userSalt
+ * Empleando el algoritmo estándar PBKDF2 (100,000 iteraciones, SHA-256)
  */
-async function deriveKeyOffline(userSalt, serverPepper) {
+async function deriveKeyLocal(masterPassword, userSalt) {
   const encoder = new TextEncoder();
   
-  // En Node.js: pbkdf2Sync(SERVER_PEPPER, userSalt, 10000, 32, 'sha256')
-  // Por lo tanto, el password de PBKDF2 es el SERVER_PEPPER (serverPepper), y la sal es userSalt.
+  // La contraseña maestra actúa como el material de clave base para PBKDF2
   const baseKey = await window.crypto.subtle.importKey(
     'raw',
-    encoder.encode(serverPepper),
+    encoder.encode(masterPassword),
     { name: 'PBKDF2' },
     false,
     ['deriveKey']
   );
 
-  // En Node.js: pbkdf2Sync(SERVER_PEPPER, userSalt, 10000, 32, 'sha256')
-  // Nota crucial: en el backend pasamos 'userSalt' directamente como string (hexadecimal de 64 caracteres)
-  // por lo tanto, no debemos decodificar el hex en bytes binarios, sino codificar los caracteres UTF-8
-  // del string tal cual para que coincida exactamente con la derivación de clave de Node.js.
+  // Usar el salt de metadata del usuario
   const saltBuffer = encoder.encode(userSalt);
 
-  const cryptoKey = await window.crypto.subtle.deriveKey(
+  return await window.crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
       salt: saltBuffer,
-      iterations: 10000,
+      iterations: 100000, // 100k iteraciones para robustecer contra ataques de fuerza bruta local
       hash: 'SHA-256'
     },
     baseKey,
     { name: 'AES-CBC', length: 256 },
     false,
-    ['decrypt']
+    ['encrypt', 'decrypt']
   );
-
-  return cryptoKey;
 }
 
 /**
- * Descifra el string hexadecimal cifrado usando AES-256-CBC de forma local.
- * Requiere el Pepper del servidor guardado al hacer login de forma segura
+ * Cifra un texto en claro en el cliente usando AES-256-CBC
+ */
+async function encryptPasswordLocal(plainText, userSalt) {
+  try {
+    const masterPassword = sessionStorage.getItem('keyshield_master');
+    if (!masterPassword) {
+      throw new Error('Contraseña maestra no disponible. Inicie sesión de nuevo.');
+    }
+
+    const key = await deriveKeyLocal(masterPassword, userSalt);
+    
+    // Generar un IV aleatorio de 16 bytes
+    const iv = window.crypto.getRandomValues(new Uint8Array(16));
+    const encoder = new TextEncoder();
+
+    const encryptedBuffer = await window.crypto.subtle.encrypt(
+      {
+        name: 'AES-CBC',
+        iv: iv
+      },
+      key,
+      encoder.encode(plainText)
+    );
+
+    return {
+      encryptedData: arrayBufferToHex(encryptedBuffer),
+      iv: arrayBufferToHex(iv)
+    };
+  } catch (error) {
+    console.error('Error al cifrar localmente:', error);
+    return null;
+  }
+}
+
+/**
+ * Descifra el string hexadecimal cifrado usando AES-256-CBC localmente
  */
 async function decryptPasswordOffline(encryptedHex, ivHex, userSalt) {
   try {
-    const serverPepper = sessionStorage.getItem('keyshield_pepper');
-    if (!serverPepper) {
-      throw new Error('Pepper no disponible. Debes haber iniciado sesión online al menos una vez.');
+    const masterPassword = sessionStorage.getItem('keyshield_master');
+    if (!masterPassword) {
+      throw new Error('Contraseña maestra no disponible.');
     }
 
-    const key = await deriveKeyOffline(userSalt, serverPepper);
+    const key = await deriveKeyLocal(masterPassword, userSalt);
     const iv = hexToArrayBuffer(ivHex);
     const encryptedData = hexToArrayBuffer(encryptedHex);
 
@@ -91,5 +120,6 @@ async function decryptPasswordOffline(encryptedHex, ivHex, userSalt) {
 }
 
 window.cryptoClient = {
+  encryptPasswordLocal,
   decryptPasswordOffline
 };

@@ -72,10 +72,16 @@ window.addEventListener('appinstalled', (evt) => {
   showToast('¡KeyShield instalada con éxito!');
 });
 
-// Obtener token
-function getAuthHeader() {
-  const token = localStorage.getItem('keyshield_token');
-  return { 'Authorization': `Bearer ${token}` };
+// Helper para obtener el usuario autenticado y su salt
+async function getAuthUserAndSalt() {
+  const { data: { session } } = await window.sb.auth.getSession();
+  if (!session || !session.user) {
+    throw new Error('Sesión de usuario no activa.');
+  }
+  return {
+    userId: session.user.id,
+    salt: session.user.user_metadata.salt
+  };
 }
 
 // Inicialización de la aplicación principal
@@ -115,15 +121,14 @@ function updateConnectionBadge() {
 async function fetchCategories() {
   if (navigator.onLine) {
     try {
-      const res = await fetch('/api/clasificaciones', {
-        headers: getAuthHeader()
-      });
-      if (res.status === 403 || res.status === 401) {
-        localStorage.removeItem('keyshield_token');
-        window.location.reload();
-        return;
-      }
-      allCategories = await res.json();
+      const { data, error } = await window.sb
+        .from('clasificacion')
+        .select('id_clasificacion, id_usuario, nombre, color, icono')
+        .order('nombre', { ascending: true });
+        
+      if (error) throw error;
+      
+      allCategories = data || [];
       
       // Guardar copia local en IndexedDB
       if (window.offlineDB) {
@@ -148,7 +153,6 @@ async function fetchCategories() {
 }
 
 function renderCategories() {
-  // Limpiar listado
   categoriesListEl.innerHTML = '';
 
   // Botón "Todos"
@@ -209,22 +213,25 @@ categoryForm.addEventListener('submit', async (e) => {
   const color = document.querySelector('input[name="cat-color"]:checked').value;
 
   try {
-    const res = await fetch('/api/clasificaciones', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...getAuthHeader()
-      },
-      body: JSON.stringify({ nombre, color, icono: 'folder-line' })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
+    const { userId } = await getAuthUserAndSalt();
+    
+    const { data, error } = await window.sb
+      .from('clasificacion')
+      .insert([{
+        id_usuario: userId,
+        nombre,
+        color,
+        icono: 'folder-line'
+      }])
+      .select('id_clasificacion');
+
+    if (error) throw error;
 
     showToast('Categoría creada exitosamente.');
     categoryModal.classList.add('hidden');
     await fetchCategories();
   } catch (err) {
-    showToast(err.message);
+    showToast(err.message || 'Error al crear la categoría.');
   }
 });
 
@@ -236,10 +243,11 @@ categoryForm.addEventListener('submit', async (e) => {
 async function fetchAccounts() {
   if (navigator.onLine) {
     try {
-      const res = await fetch('/api/cuentas', {
-        headers: getAuthHeader()
-      });
-      allAccounts = await res.json();
+      // Llamar al helper RPC get_mis_cuentas definido en keyshield_v2.sql
+      const { data, error } = await window.sb.rpc('get_mis_cuentas');
+      if (error) throw error;
+      
+      allAccounts = data || [];
       
       // Guardar en la base de datos local
       if (window.offlineDB) {
@@ -267,7 +275,7 @@ function filterAndRenderAccounts() {
   const filtered = allAccounts.filter(acc => {
     // 1. Filtro por categoría seleccionada
     const matchesCategory = selectedCategoryId === null || 
-      acc.clasificaciones.some(cat => cat.id_clasificacion === selectedCategoryId);
+      (acc.clasificaciones && acc.clasificaciones.some(cat => cat.id_clasificacion === selectedCategoryId));
 
     // 2. Filtro por término de búsqueda
     const matchesSearch = acc.nombre_servicio.toLowerCase().includes(searchTerm) ||
@@ -303,7 +311,8 @@ function renderAccounts(accounts) {
     card.setAttribute('data-id', acc.id_cuenta);
 
     // Formatear categorías asignadas
-    const tagsHtml = acc.clasificaciones.map(tag => `
+    const clasifArray = acc.clasificaciones || [];
+    const tagsHtml = clasifArray.map(tag => `
       <span class="tag-badge" style="background-color: ${tag.color}15; color: ${tag.color}; border: 1px solid ${tag.color}30">
         <i class="ri-${tag.icono || 'folder-line'}"></i>
         ${tag.nombre}
@@ -385,13 +394,11 @@ function renderAccounts(accounts) {
           });
           showToast('Datos compartidos correctamente.');
         } catch (err) {
-          // Ignorar si el usuario canceló la acción nativa
           if (err.name !== 'AbortError') {
             showToast('Error al compartir.');
           }
         }
       } else {
-        // Fallback si no está disponible la Web Share API (ej. en navegadores de escritorio viejos)
         const textToCopy = `Servicio: ${acc.nombre_servicio}\nUsuario: ${acc.nombre_cuenta}${acc.url_servicio ? `\nEnlace: ${acc.url_servicio}` : ''}`;
         navigator.clipboard.writeText(textToCopy);
         showToast('Datos copiados para compartir.');
@@ -405,42 +412,25 @@ function renderAccounts(accounts) {
   });
 }
 
-// Descifrar contraseña de forma dinámica a demanda
+// Descifrar contraseña de forma dinámica en el cliente
 async function decryptPassword(id_cuenta) {
-  if (navigator.onLine) {
-    try {
-      const res = await fetch(`/api/cuentas/${id_cuenta}/ver`, {
-        method: 'POST',
-        headers: getAuthHeader()
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      return data.password;
-    } catch (err) {
-      showToast('Error al descifrar la contraseña');
-      return null;
-    }
-  } else {
-    // Desencriptado local/offline usando la Web Crypto API y el pepper de sessionStorage
-    try {
-      const acc = allAccounts.find(a => a.id_cuenta === id_cuenta);
-      if (!acc) throw new Error('Cuenta no encontrada localmente.');
-      
-      const user = JSON.parse(localStorage.getItem('keyshield_user'));
-      if (!user || !user.salt) throw new Error('Usuario o salt no válidos.');
+  try {
+    const acc = allAccounts.find(a => a.id_cuenta === id_cuenta);
+    if (!acc) throw new Error('Cuenta no encontrada.');
+    
+    const { salt } = await getAuthUserAndSalt();
 
-      if (window.cryptoClient && window.cryptoClient.decryptPasswordOffline) {
-        const decrypted = await window.cryptoClient.decryptPasswordOffline(acc.password_cifrada, acc.iv, user.salt);
-        if (!decrypted) throw new Error('Criptografía fallida.');
-        return decrypted;
-      } else {
-        throw new Error('Módulo criptográfico no disponible.');
-      }
-    } catch (err) {
-      console.error('Error descifrado offline:', err);
-      showToast('Error al descifrar la contraseña en modo offline');
-      return null;
+    if (window.cryptoClient && window.cryptoClient.decryptPasswordOffline) {
+      const decrypted = await window.cryptoClient.decryptPasswordOffline(acc.password_cifrada, acc.iv, salt);
+      if (!decrypted) throw new Error('Criptografía fallida.');
+      return decrypted;
+    } else {
+      throw new Error('Módulo criptográfico no disponible.');
     }
+  } catch (err) {
+    console.error('Error al descifrar contraseña:', err);
+    showToast('Error al descifrar la contraseña.');
+    return null;
   }
 }
 
@@ -449,16 +439,17 @@ async function deleteAccount(id) {
   if (!confirm('¿Estás seguro de que deseas eliminar esta cuenta permanentemente?')) return;
 
   try {
-    const res = await fetch(`/api/cuentas/${id}`, {
-      method: 'DELETE',
-      headers: getAuthHeader()
-    });
-    if (!res.ok) throw new Error('No se pudo eliminar la cuenta');
+    const { error } = await window.sb
+      .from('cuenta')
+      .delete()
+      .eq('id_cuenta', id);
+      
+    if (error) throw error;
     
     showToast('Cuenta eliminada.');
     await fetchAccounts();
   } catch (err) {
-    showToast(err.message);
+    showToast(err.message || 'No se pudo eliminar la cuenta');
   }
 }
 
@@ -470,7 +461,6 @@ btnAddAccount.addEventListener('click', () => {
   document.getElementById('account-id').value = '';
   accountForm.reset();
   document.getElementById('modal-title').textContent = 'Añadir Cuenta';
-  // Desmarcar todos los checkboxes del modal
   document.querySelectorAll('input[name="modal-cats"]').forEach(cb => cb.checked = false);
   accountModal.classList.remove('hidden');
 });
@@ -480,17 +470,16 @@ function openEditAccountModal(account) {
   document.getElementById('acc-service').value = account.nombre_servicio;
   document.getElementById('acc-url').value = account.url_servicio || '';
   document.getElementById('acc-username').value = account.nombre_cuenta;
-  document.getElementById('acc-notes').value = account.notas || '';
+  document.getElementById('acc-notes').value = account.notes || account.notas || '';
   document.getElementById('modal-title').textContent = 'Editar Cuenta';
   
-  // No rellenamos la contraseña por defecto para forzar que sea opcional en la actualización
   modalPassInput.value = '';
   modalPassInput.placeholder = '•••••••••••• (dejar vacío si no cambia)';
   modalPassInput.required = false;
 
-  // Marcar los checkboxes correspondientes
+  const clasifArray = account.clasificaciones || [];
   document.querySelectorAll('input[name="modal-cats"]').forEach(cb => {
-    cb.checked = account.clasificaciones.some(cat => cat.id_clasificacion == cb.value);
+    cb.checked = clasifArray.some(cat => cat.id_clasificacion == cb.value);
   });
 
   accountModal.classList.remove('hidden');
@@ -507,38 +496,79 @@ accountForm.addEventListener('submit', async (e) => {
   const password_texto_plano = modalPassInput.value;
   const notas = document.getElementById('acc-notes').value;
 
-  // Obtener clasificaciones seleccionadas
   const clasificaciones = Array.from(document.querySelectorAll('input[name="modal-cats"]:checked'))
     .map(cb => parseInt(cb.value));
 
-  const body = { nombre_servicio, url_servicio, nombre_cuenta, notas, clasificaciones };
-  
-  // Agregar contraseña si está especificada o si es una creación obligatoria
-  if (password_texto_plano) {
-    body.password_texto_plano = password_texto_plano;
-  }
-
-  const isEdit = id !== '';
-  const url = isEdit ? `/api/cuentas/${id}` : '/api/cuentas';
-  const method = isEdit ? 'PUT' : 'POST';
-
   try {
-    const res = await fetch(url, {
-      method: method,
-      headers: {
-        'Content-Type': 'application/json',
-        ...getAuthHeader()
-      },
-      body: JSON.stringify(body)
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Error al guardar');
+    const { userId, salt } = await getAuthUserAndSalt();
+    const isEdit = id !== '';
+
+    let payload = {
+      id_usuario: userId,
+      nombre_servicio,
+      url_servicio: url_servicio || null,
+      nombre_cuenta,
+      notas: notas || null
+    };
+
+    // Si se especificó una nueva contraseña o si es creación obligatoria
+    if (password_texto_plano) {
+      const encrypted = await window.cryptoClient.encryptPasswordLocal(password_texto_plano, salt);
+      if (!encrypted) throw new Error('Error al cifrar la contraseña en el cliente.');
+      payload.password_cifrada = encrypted.encryptedData;
+      payload.iv = encrypted.iv;
+    } else if (!isEdit) {
+      throw new Error('La contraseña es obligatoria para nuevas cuentas.');
+    }
+
+    let accountId = id;
+
+    if (isEdit) {
+      const { error } = await window.sb
+        .from('cuenta')
+        .update(payload)
+        .eq('id_cuenta', id);
+        
+      if (error) throw error;
+    } else {
+      const { data, error } = await window.sb
+        .from('cuenta')
+        .insert([payload])
+        .select('id_cuenta');
+        
+      if (error) throw error;
+      accountId = data[0].id_cuenta;
+    }
+
+    // Actualizar clasificaciones asociadas en la tabla puente cuenta_clasificacion
+    if (isEdit) {
+      // Borrar relaciones viejas
+      const { error: delError } = await window.sb
+        .from('cuenta_clasificacion')
+        .delete()
+        .eq('id_cuenta', accountId);
+        
+      if (delError) throw delError;
+    }
+
+    if (clasificaciones.length > 0) {
+      const bridgeRows = clasificaciones.map(id_clasif => ({
+        id_cuenta: accountId,
+        id_clasificacion: id_clasif
+      }));
+      
+      const { error: insertError } = await window.sb
+        .from('cuenta_clasificacion')
+        .insert(bridgeRows);
+        
+      if (insertError) throw insertError;
+    }
 
     showToast(isEdit ? 'Cuenta actualizada correctamente.' : 'Cuenta guardada correctamente.');
     accountModal.classList.add('hidden');
     await fetchAccounts();
   } catch (err) {
-    showToast(err.message);
+    showToast(err.message || 'Error al guardar la cuenta.');
   }
 });
 
@@ -627,11 +657,11 @@ function resetInactivityTimer() {
   clearTimeout(inactivityTimeout);
   
   // 15 minutos = 15 * 60 * 1000 ms
-  inactivityTimeout = setTimeout(() => {
-    const token = localStorage.getItem('keyshield_token');
-    if (token) {
-      localStorage.removeItem('keyshield_token');
-      localStorage.removeItem('keyshield_user');
+  inactivityTimeout = setTimeout(async () => {
+    const { data: { session } } = await window.sb.auth.getSession();
+    if (session) {
+      await window.sb.auth.signOut();
+      sessionStorage.removeItem('keyshield_master');
       window.location.reload();
       alert('Tu sesión ha expirado por inactividad.');
     }

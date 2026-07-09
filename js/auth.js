@@ -13,9 +13,6 @@ function showToast(message, duration = 3000) {
   }, duration);
 }
 
-// Configuración global de la API
-const API_URL = '/api';
-
 // Elementos de autenticación
 const authContainer = document.getElementById('auth-container');
 const appContainer = document.getElementById('app-container');
@@ -39,6 +36,13 @@ toLoginLink.addEventListener('click', (e) => {
   document.getElementById('auth-subtitle').textContent = 'Guarda y organiza tus accesos de forma segura';
 });
 
+// Helper para generar salt criptográfico aleatorio en el cliente
+function generateSalt() {
+  const arr = new Uint8Array(32);
+  window.crypto.getRandomValues(arr);
+  return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 // Manejo de Registro
 registerForm.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -52,22 +56,27 @@ registerForm.addEventListener('submit', async (e) => {
   }
 
   try {
-    const response = await fetch(`${API_URL}/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre_usuario, email, password })
-    });
-    const data = await response.json();
+    // Generar un salt único para derivación de claves en este usuario
+    const salt = generateSalt();
 
-    if (!response.ok) {
-      throw new Error(data.error || 'Error en el registro');
-    }
+    const { data, error } = await window.sb.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          nombre_usuario,
+          salt
+        }
+      }
+    });
+
+    if (error) throw error;
 
     showToast('¡Registro exitoso! Ya puedes iniciar sesión.');
     registerForm.reset();
     toLoginLink.click();
   } catch (error) {
-    showToast(error.message);
+    showToast(error.message || 'Error en el registro');
   }
 });
 
@@ -78,57 +87,48 @@ loginForm.addEventListener('submit', async (e) => {
   const password = document.getElementById('login-password').value;
 
   try {
-    const response = await fetch(`${API_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
+    const { data, error } = await window.sb.auth.signInWithPassword({
+      email,
+      password
     });
-    const data = await response.json();
 
-    if (!response.ok) {
-      throw new Error(data.error || 'Error de autenticación');
-    }
+    if (error) throw error;
 
-    // Almacenar token de sesión y parámetros criptográficos
-    localStorage.setItem('keyshield_token', data.token);
-    localStorage.setItem('keyshield_user', JSON.stringify(data.usuario));
-    sessionStorage.setItem('keyshield_pepper', data.pepper);
+    // Almacenar contraseña maestra TEMPORALMENTE en sessionStorage para criptografía offline/local
+    // No persiste al cerrar la pestaña/ventana del navegador
+    sessionStorage.setItem('keyshield_master', password);
 
     showToast('¡Acceso concedido!');
     loginForm.reset();
-    
-    // Iniciar dashboard principal
-    checkAuth();
   } catch (error) {
-    showToast(error.message);
+    showToast(error.message || 'Error de autenticación');
   }
 });
 
 // Cierre de Sesión
 document.getElementById('btn-logout').addEventListener('click', async () => {
-  localStorage.removeItem('keyshield_token');
-  localStorage.removeItem('keyshield_user');
-  sessionStorage.removeItem('keyshield_pepper');
-  if (window.offlineDB) {
-    try {
+  try {
+    await window.sb.auth.signOut();
+    sessionStorage.removeItem('keyshield_master');
+    if (window.offlineDB) {
       await window.offlineDB.clearOfflineData();
-    } catch (err) {
-      console.error('Error al limpiar datos offline:', err);
     }
+    showToast('Sesión cerrada.');
+  } catch (err) {
+    console.error('Error al cerrar sesión:', err);
   }
-  checkAuth();
-  showToast('Sesión cerrada.');
 });
 
-// Verificar si hay sesión activa al cargar
-function checkAuth() {
-  const token = localStorage.getItem('keyshield_token');
-  const user = JSON.parse(localStorage.getItem('keyshield_user'));
-
-  if (token && user) {
+// Verificar si hay sesión activa y sincronizar UI
+async function checkAuth() {
+  const { data: { session } } = await window.sb.auth.getSession();
+  
+  if (session && session.user) {
     authContainer.classList.add('hidden');
     appContainer.classList.remove('hidden');
-    document.getElementById('user-display').textContent = user.nombre_usuario;
+    
+    const userMetadata = session.user.user_metadata || {};
+    document.getElementById('user-display').textContent = userMetadata.nombre_usuario || session.user.email;
     
     // Disparar carga del dashboard en app.js
     if (window.initializeDashboard) {
@@ -142,7 +142,11 @@ function checkAuth() {
 
 // Inicializar autenticación al cargar el documento
 document.addEventListener('DOMContentLoaded', () => {
-  checkAuth();
+  // Suscribirse a cambios en el estado de autenticación (Login, Logout, etc.)
+  window.sb.auth.onAuthStateChange((event, session) => {
+    console.log('Cambio de estado de Auth Supabase:', event);
+    checkAuth();
+  });
 
   // Registrar Service Worker para soporte PWA
   if ('serviceWorker' in navigator) {
