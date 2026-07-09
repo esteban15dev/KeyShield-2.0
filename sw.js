@@ -1,16 +1,16 @@
-const CACHE_NAME = 'keyshield-cache-v3';
+const CACHE_NAME = 'keyshield-cache-v4';
 const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/offline.html',
-  '/css/styles.css',
-  '/js/auth.js',
-  '/js/app.js',
-  '/js/offlineDB.js',
-  '/js/cryptoClient.js',
-  '/manifest.json',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png'
+  './',
+  'index.html',
+  'offline.html',
+  'css/styles.css',
+  'js/auth.js',
+  'js/app.js',
+  'js/offlineDB.js',
+  'js/cryptoClient.js',
+  'manifest.json',
+  'icons/icon-192x192.png',
+  'icons/icon-512x512.png'
 ];
 
 // URLs externas que también queremos cachear (fuentes, iconos)
