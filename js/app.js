@@ -128,7 +128,13 @@ async function fetchCategories() {
         
       if (error) throw error;
       
-      allCategories = data || [];
+      const rawCategories = data || [];
+      // Ordenar: primero las globales (id_usuario === null) y luego las de usuario por orden alfabético
+      allCategories = rawCategories.sort((a, b) => {
+        if (a.id_usuario === null && b.id_usuario !== null) return -1;
+        if (a.id_usuario !== null && b.id_usuario === null) return 1;
+        return a.nombre.localeCompare(b.nombre);
+      });
       
       // Guardar copia local en IndexedDB
       if (window.offlineDB) {
@@ -137,11 +143,15 @@ async function fetchCategories() {
     } catch (err) {
       console.error('Error al obtener clasificaciones online:', err);
     }
-  } else {
     // Si está offline, recuperar de IndexedDB
     if (window.offlineDB) {
       try {
-        allCategories = await window.offlineDB.getClasificaciones();
+        const rawCategories = await window.offlineDB.getClasificaciones();
+        allCategories = rawCategories.sort((a, b) => {
+          if (a.id_usuario === null && b.id_usuario !== null) return -1;
+          if (a.id_usuario !== null && b.id_usuario === null) return 1;
+          return a.nombre.localeCompare(b.nombre);
+        });
       } catch (err) {
         console.error('Error al leer clasificaciones offline:', err);
       }
