@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="Gestor de contraseñas rápido, moderno, seguro y optimizado con diseño mobile-first.">
+  <title>KeyShield — Gestor de Contraseñas</title>
+  
+  <!-- Configuración PWA / Móvil -->
+  <meta name="theme-color" content="#0a0a0f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+  <link rel="manifest" href="manifest.json">
+  
+  <!-- Tipografía premium Google Fonts (Outfit) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Remix Icons para iconos modernos, livianos y limpios -->
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+  
+  <!-- Enlace a estilos CSS -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- ================= AUTH CONTAINER ================= -->
+  <main id="auth-container" class="auth-wrapper">
+    <div class="auth-card">
+      <header class="auth-header">
+        <div class="logo-area">
+          <i class="ri-shield-keyhole-line"></i>
+          <h1>KeyShield</h1>
+        </div>
+        <p id="auth-subtitle">Guarda y organiza tus accesos de forma segura</p>
+      </header>
+
+      <!-- Formulario de Login -->
+      <form id="login-form" class="auth-form">
+        <div class="input-group">
+          <label for="login-email">Correo Electrónico</label>
+          <div class="input-wrapper">
+            <i class="ri-mail-line"></i>
+            <input type="email" id="login-email" placeholder="correo@ejemplo.com" required autocomplete="email">
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label for="login-password">Contraseña Maestra</label>
+          <div class="input-wrapper">
+            <i class="ri-lock-2-line"></i>
+            <input type="password" id="login-password" placeholder="••••••••••••" required autocomplete="current-password">
+            <button type="button" class="btn-auth-eye" data-target="login-password" title="Mostrar contraseña">
+              <i class="ri-eye-line"></i>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block">
+          <span>Ingresar</span>
+          <i class="ri-arrow-right-line"></i>
+        </button>
+
+        <p class="auth-switch">¿No tienes cuenta? <a href="#" id="to-register">Regístrate gratis</a></p>
+      </form>
+
+      <!-- Formulario de Registro -->
+      <form id="register-form" class="auth-form hidden">
+        <div class="input-group">
+          <label for="reg-username">Nombre de Usuario</label>
+          <div class="input-wrapper">
+            <i class="ri-user-line"></i>
+            <input type="text" id="reg-username" placeholder="ej. esteban_dev" required autocomplete="username">
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label for="reg-email">Correo Electrónico</label>
+          <div class="input-wrapper">
+            <i class="ri-mail-line"></i>
+            <input type="email" id="reg-email" placeholder="correo@ejemplo.com" required autocomplete="email">
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label for="reg-password">Contraseña Maestra</label>
+          <div class="input-wrapper">
+            <i class="ri-lock-2-line"></i>
+            <input type="password" id="reg-password" placeholder="Mínimo 8 caracteres" required autocomplete="new-password">
+            <button type="button" class="btn-auth-eye" data-target="reg-password" title="Mostrar contraseña">
+              <i class="ri-eye-line"></i>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-success btn-block">
+          <span>Crear Cuenta</span>
+          <i class="ri-user-add-line"></i>
+        </button>
+
+        <p class="auth-switch">¿Ya tienes cuenta? <a href="#" id="to-login">Inicia Sesión</a></p>
+      </form>
+    </div>
+  </main>
+
+  <!-- ================= APP CONTAINER (DASHBOARD) ================= -->
+  <div id="app-container" class="app-wrapper hidden">
+    
+    <!-- Header Principal -->
+    <header class="app-header">
+      <div class="app-logo">
+        <i class="ri-shield-keyhole-fill"></i>
+        <span>KeyShield</span>
+      </div>
+      <div class="user-profile">
+        <span id="offline-badge" class="offline-badge hidden" title="Trabajando sin conexión">
+          <i class="ri-wifi-off-fill"></i> Offline
+        </span>
+        <button id="btn-install-app" class="btn btn-secondary-outline btn-xs hidden" style="display: inline-flex; align-items: center; gap: 4px;">
+          <i class="ri-download-cloud-line"></i> Instalar App
+        </button>
+        <span id="user-display">Usuario</span>
+        <button id="btn-logout" class="btn-icon" title="Cerrar Sesión">
+          <i class="ri-logout-box-r-line"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Navegación de Filtros y Clasificaciones (Scroll Horizontal en Mobile) -->
+    <section class="filter-bar">
+      <h2>Categorías</h2>
+      <div class="categories-scroll" id="categories-list">
+        <!-- Renderizado dinámico -->
+      </div>
+    </section>
+
+    <!-- Barra de Búsqueda y Botón Añadir -->
+    <section class="action-bar">
+      <div class="search-wrapper">
+        <i class="ri-search-line"></i>
+        <input type="text" id="search-input" placeholder="Buscar cuenta o servicio...">
+      </div>
+      <button id="btn-add-account" class="btn btn-primary btn-round">
+        <i class="ri-add-line"></i>
+        <span>Añadir</span>
+      </button>
+    </section>
+
+    <!-- Listado Principal de Cuentas -->
+    <main class="accounts-section">
+      <div class="accounts-header">
+        <span id="accounts-count">0 cuentas guardadas</span>
+        <button id="btn-add-category" class="btn btn-secondary-outline btn-xs">
+          <i class="ri-folder-add-line"></i> Nueva Categoría
+        </button>
+      </div>
+
+      <div class="accounts-list" id="accounts-list">
+        <!-- Renderizado de cuentas -->
+        <div class="empty-state">
+          <i class="ri-shield-line"></i>
+          <p>No tienes cuentas guardadas en esta categoría.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ================= MODAL: AGREGAR/EDITAR CUENTA ================= -->
+  <div id="account-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-title">Añadir Cuenta</h3>
+        <button class="btn-close-modal"><i class="ri-close-line"></i></button>
+      </div>
+      <form id="account-form" class="modal-form">
+        <input type="hidden" id="account-id">
+
+        <div class="input-group">
+          <label for="acc-service">Servicio / Plataforma</label>
+          <div class="input-wrapper">
+            <i class="ri-global-line"></i>
+            <input type="text" id="acc-service" placeholder="ej. Netflix, Google, Banco" required>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label for="acc-url">URL del Sitio (opcional)</label>
+          <div class="input-wrapper">
+            <i class="ri-link"></i>
+            <input type="url" id="acc-url" placeholder="ej. https://netflix.com">
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label for="acc-username">Usuario / Correo de la Cuenta</label>
+          <div class="input-wrapper">
+            <i class="ri-user-shared-line"></i>
+            <input type="text" id="acc-username" placeholder="ej. correo_netflix@gmail.com" required>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label for="acc-password">Contraseña</label>
+          <div class="input-wrapper password-field-group">
+            <i class="ri-key-2-line"></i>
+            <input type="password" id="acc-password" placeholder="Tu contraseña del servicio" required autocomplete="new-password">
+            <button type="button" id="btn-toggle-modal-pass" class="btn-show-pass">
+              <i class="ri-eye-line"></i>
+            </button>
+            <button type="button" id="btn-gen-pass" class="btn-generate-pass" title="Generar Contraseña Segura">
+              <i class="ri-magic-line"></i>
+            </button>
+          </div>
+          <div id="password-strength-container" style="margin-top: 4px;">
+            <div id="password-strength-bar" style="height: 4px; width: 0%; border-radius: 2px; transition: all 0.3s ease;"></div>
+            <span id="password-strength-text" style="font-size: 0.75rem; color: var(--text-muted);">Fuerza de la contraseña</span>
+          </div>
+        </div>
+
+
+        <div class="input-group">
+          <label>Categorías / Clasificaciones</label>
+          <div class="categories-checkbox-grid" id="modal-categories-grid">
+            <!-- Listado dinámico de checkboxes -->
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label for="acc-notes">Notas (opcional)</label>
+          <textarea id="acc-notes" rows="3" placeholder="Información adicional, preguntas de seguridad..."></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary btn-close-modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: NUEVA CATEGORÍA ================= -->
+  <div id="category-modal" class="modal hidden">
+    <div class="modal-content modal-content-sm">
+      <div class="modal-header">
+        <h3>Nueva Categoría</h3>
+        <button class="btn-close-cat-modal"><i class="ri-close-line"></i></button>
+      </div>
+      <form id="category-form" class="modal-form">
+        <div class="input-group">
+          <label for="cat-name">Nombre de Categoría</label>
+          <div class="input-wrapper">
+            <i class="ri-folder-line"></i>
+            <input type="text" id="cat-name" placeholder="ej. Trabajo, Finanzas" required>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label>Color</label>
+          <div class="color-picker-grid">
+            <label class="color-option"><input type="radio" name="cat-color" value="#3b82f6" checked><span style="background-color: #3b82f6;"></span></label>
+            <label class="color-option"><input type="radio" name="cat-color" value="#10b981"><span style="background-color: #10b981;"></span></label>
+            <label class="color-option"><input type="radio" name="cat-color" value="#8b5cf6"><span style="background-color: #8b5cf6;"></span></label>
+            <label class="color-option"><input type="radio" name="cat-color" value="#ec4899"><span style="background-color: #ec4899;"></span></label>
+            <label class="color-option"><input type="radio" name="cat-color" value="#f59e0b"><span style="background-color: #f59e0b;"></span></label>
+            <label class="color-option"><input type="radio" name="cat-color" value="#ef4444"><span style="background-color: #ef4444;"></span></label>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary btn-close-cat-modal">Cancelar</button>
+          <button type="submit" class="btn btn-success">Crear</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification System -->
+  <div id="toast" class="toast hidden">Notificación</div>
+
+  <!-- Scripts de la Aplicación -->
+  <script src="js/offlineDB.js"></script>
+  <script src="js/cryptoClient.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
