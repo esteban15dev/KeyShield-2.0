@@ -252,52 +252,55 @@ function renderCategories() {
     let touchTimeout;
     let startTouchX = 0;
     let startTouchY = 0;
-    let activeDraggedChip = null;
+    let isTouchDragging = false;
 
     handleEl.addEventListener('touchstart', (e) => {
       const touch = e.touches[0];
       startTouchX = touch.clientX;
       startTouchY = touch.clientY;
-      activeDraggedChip = null;
+      isTouchDragging = false;
 
       // Detectar pulsación larga (450ms) para iniciar el modo arrastre
       touchTimeout = setTimeout(() => {
-        activeDraggedChip = chip;
+        isTouchDragging = true;
         chip.classList.add('dragging');
         if (navigator.vibrate) {
-          navigator.vibrate(50); // Feedback háptico opcional si es soportado
+          navigator.vibrate(50); // Feedback háptico de vibración
         }
       }, 450);
-    }, { passive: true });
+    }, { passive: false });
 
     handleEl.addEventListener('touchmove', (e) => {
       const touch = e.touches[0];
 
-      if (!activeDraggedChip) {
-        // Si el usuario desliza el dedo rápido para hacer scroll, cancelar la pulsación larga
+      if (!isTouchDragging) {
+        // Cancelar pulsación larga si el usuario se mueve rápido (scroll)
         if (Math.abs(touch.clientX - startTouchX) > 10 || Math.abs(touch.clientY - startTouchY) > 10) {
           clearTimeout(touchTimeout);
         }
         return;
       }
 
-      // Prevenir el scroll nativo de la pantalla al estar arrastrando
+      // Evitar scroll nativo mientras se arrastra la categoría
       e.preventDefault();
 
       const x = touch.clientX;
       const y = touch.clientY;
 
-      // Limpiar efectos de drag-over anteriores de todos los chips
+      // Limpiar clases visuales previas
       document.querySelectorAll('.category-chip').forEach(c => {
         c.classList.remove('drag-over', 'drop-left', 'drop-right');
       });
 
-      // Identificar el chip objetivo debajo del dedo
+      // Temporalmente ocultar puntero sobre el elemento arrastrado para que elementFromPoint detecte lo que hay debajo
+      chip.style.pointerEvents = 'none';
       const elementUnderTouch = document.elementFromPoint(x, y);
+      chip.style.pointerEvents = '';
+
       if (!elementUnderTouch) return;
 
       const targetChip = elementUnderTouch.closest('.category-chip');
-      if (targetChip && targetChip !== activeDraggedChip && targetChip.dataset.id) {
+      if (targetChip && targetChip !== chip && targetChip.dataset.id) {
         const rect = targetChip.getBoundingClientRect();
         const midpoint = rect.left + rect.width / 2;
         if (x < midpoint) {
@@ -312,7 +315,7 @@ function renderCategories() {
     handleEl.addEventListener('touchend', (e) => {
       clearTimeout(touchTimeout);
 
-      if (!activeDraggedChip) return;
+      if (!isTouchDragging) return;
 
       chip.classList.remove('dragging');
 
@@ -320,11 +323,15 @@ function renderCategories() {
       const x = touch.clientX;
       const y = touch.clientY;
 
+      // Desactivar temporalmente puntero para leer elemento debajo
+      chip.style.pointerEvents = 'none';
       const elementUnderTouch = document.elementFromPoint(x, y);
+      chip.style.pointerEvents = '';
+
       const targetChip = elementUnderTouch ? elementUnderTouch.closest('.category-chip') : null;
 
-      if (targetChip && targetChip !== activeDraggedChip && targetChip.dataset.id) {
-        const draggedId = parseInt(activeDraggedChip.dataset.id);
+      if (targetChip && targetChip !== chip && targetChip.dataset.id) {
+        const draggedId = parseInt(chip.dataset.id);
         const targetId = parseInt(targetChip.dataset.id);
 
         const draggedIndex = allCategories.findIndex(c => c.id_clasificacion === draggedId);
@@ -354,18 +361,18 @@ function renderCategories() {
       document.querySelectorAll('.category-chip').forEach(c => {
         c.classList.remove('drag-over', 'drop-left', 'drop-right');
       });
-      activeDraggedChip = null;
+      isTouchDragging = false;
       renderCategories();
     });
 
     handleEl.addEventListener('touchcancel', () => {
       clearTimeout(touchTimeout);
-      if (activeDraggedChip) {
+      if (isTouchDragging) {
         chip.classList.remove('dragging');
         document.querySelectorAll('.category-chip').forEach(c => {
           c.classList.remove('drag-over', 'drop-left', 'drop-right');
         });
-        activeDraggedChip = null;
+        isTouchDragging = false;
         renderCategories();
       }
     });
