@@ -646,10 +646,19 @@ input, button, textarea {
 }
 
 /* Drag & Drop Categories */
-.category-chip[draggable="true"] {
+.drag-handle {
   cursor: grab;
   user-select: none;
   touch-action: none;
+  transition: var(--transition-smooth);
+}
+
+.drag-handle:hover {
+  color: var(--text-primary) !important;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
 }
 
 .category-chip.dragging {

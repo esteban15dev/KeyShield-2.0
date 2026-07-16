@@ -221,18 +221,32 @@ function renderCategories() {
     chip.className = `category-chip ${selectedCategoryId === cat.id_clasificacion ? 'active' : ''}`;
     chip.style.borderColor = cat.color;
     chip.dataset.id = cat.id_clasificacion;
-    chip.draggable = true;
+    chip.draggable = false; // Por defecto desactivado para no interferir con scroll
     
     // Si la categoría pertenece al usuario (no es global), añadir botón de eliminar
     const isCustom = cat.id_usuario !== null;
     
     chip.innerHTML = `
+      <div class="drag-handle" title="Arrastrar para reordenar" style="display: inline-flex; align-items: center; justify-content: center; padding: 4px 6px; margin-left: -8px; margin-right: 2px; cursor: grab; color: var(--text-muted); font-size: 1.1rem;">
+        <i class="ri-draggable"></i>
+      </div>
       <div class="category-chip-content" style="display: flex; align-items: center; gap: 6px;">
         <i class="ri-${cat.icono || 'folder-line'}" style="color: ${cat.color}"></i>
         <span>${cat.nombre}</span>
       </div>
       ${isCustom ? `<button class="btn-delete-cat" data-id="${cat.id_clasificacion}" title="Eliminar categoría" style="background: none; border: none; padding: 2px; cursor: pointer; color: var(--text-muted); display: inline-flex; align-items: center; margin-left: 4px; font-size: 1rem;"><i class="ri-close-line"></i></button>` : ''}
     `;
+
+    // Activar drag solo cuando se presione el handle
+    const handleEl = chip.querySelector('.drag-handle');
+    
+    handleEl.addEventListener('mousedown', () => {
+      chip.draggable = true;
+    });
+
+    handleEl.addEventListener('mouseup', () => {
+      chip.draggable = false;
+    });
 
     // Evento de click principal en el chip de categoría
     chip.querySelector('.category-chip-content').addEventListener('click', (e) => {
@@ -263,6 +277,7 @@ function renderCategories() {
     });
 
     chip.addEventListener('dragend', () => {
+      chip.draggable = false;
       chip.classList.remove('dragging');
       document.querySelectorAll('.category-chip').forEach(c => {
         c.classList.remove('drag-over', 'drop-left', 'drop-right');
