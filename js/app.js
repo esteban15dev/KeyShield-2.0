@@ -237,7 +237,7 @@ function renderCategories() {
       ${isCustom ? `<button class="btn-delete-cat" data-id="${cat.id_clasificacion}" title="Eliminar categoría" style="background: none; border: none; padding: 2px; cursor: pointer; color: var(--text-muted); display: inline-flex; align-items: center; margin-left: 4px; font-size: 1rem;"><i class="ri-close-line"></i></button>` : ''}
     `;
 
-    // Activar drag solo cuando se presione el handle
+    // Activar drag solo cuando se presione el handle (PC)
     const handleEl = chip.querySelector('.drag-handle');
     
     handleEl.addEventListener('mousedown', () => {
@@ -246,6 +246,128 @@ function renderCategories() {
 
     handleEl.addEventListener('mouseup', () => {
       chip.draggable = false;
+    });
+
+    // Soporte para pantallas táctiles (Móvil)
+    let touchTimeout;
+    let startTouchX = 0;
+    let startTouchY = 0;
+    let activeDraggedChip = null;
+
+    handleEl.addEventListener('touchstart', (e) => {
+      const touch = e.touches[0];
+      startTouchX = touch.clientX;
+      startTouchY = touch.clientY;
+      activeDraggedChip = null;
+
+      // Detectar pulsación larga (450ms) para iniciar el modo arrastre
+      touchTimeout = setTimeout(() => {
+        activeDraggedChip = chip;
+        chip.classList.add('dragging');
+        if (navigator.vibrate) {
+          navigator.vibrate(50); // Feedback háptico opcional si es soportado
+        }
+      }, 450);
+    }, { passive: true });
+
+    handleEl.addEventListener('touchmove', (e) => {
+      const touch = e.touches[0];
+
+      if (!activeDraggedChip) {
+        // Si el usuario desliza el dedo rápido para hacer scroll, cancelar la pulsación larga
+        if (Math.abs(touch.clientX - startTouchX) > 10 || Math.abs(touch.clientY - startTouchY) > 10) {
+          clearTimeout(touchTimeout);
+        }
+        return;
+      }
+
+      // Prevenir el scroll nativo de la pantalla al estar arrastrando
+      e.preventDefault();
+
+      const x = touch.clientX;
+      const y = touch.clientY;
+
+      // Limpiar efectos de drag-over anteriores de todos los chips
+      document.querySelectorAll('.category-chip').forEach(c => {
+        c.classList.remove('drag-over', 'drop-left', 'drop-right');
+      });
+
+      // Identificar el chip objetivo debajo del dedo
+      const elementUnderTouch = document.elementFromPoint(x, y);
+      if (!elementUnderTouch) return;
+
+      const targetChip = elementUnderTouch.closest('.category-chip');
+      if (targetChip && targetChip !== activeDraggedChip && targetChip.dataset.id) {
+        const rect = targetChip.getBoundingClientRect();
+        const midpoint = rect.left + rect.width / 2;
+        if (x < midpoint) {
+          targetChip.classList.add('drop-left');
+        } else {
+          targetChip.classList.add('drop-right');
+        }
+        targetChip.classList.add('drag-over');
+      }
+    }, { passive: false });
+
+    handleEl.addEventListener('touchend', (e) => {
+      clearTimeout(touchTimeout);
+
+      if (!activeDraggedChip) return;
+
+      chip.classList.remove('dragging');
+
+      const touch = e.changedTouches[0];
+      const x = touch.clientX;
+      const y = touch.clientY;
+
+      const elementUnderTouch = document.elementFromPoint(x, y);
+      const targetChip = elementUnderTouch ? elementUnderTouch.closest('.category-chip') : null;
+
+      if (targetChip && targetChip !== activeDraggedChip && targetChip.dataset.id) {
+        const draggedId = parseInt(activeDraggedChip.dataset.id);
+        const targetId = parseInt(targetChip.dataset.id);
+
+        const draggedIndex = allCategories.findIndex(c => c.id_clasificacion === draggedId);
+        const targetIndex = allCategories.findIndex(c => c.id_clasificacion === targetId);
+
+        if (draggedIndex !== -1 && targetIndex !== -1) {
+          const rect = targetChip.getBoundingClientRect();
+          const midpoint = rect.left + rect.width / 2;
+          let newIndex = targetIndex;
+          if (x >= midpoint) {
+            newIndex = targetIndex + 1;
+          }
+
+          // Reordenar array
+          const [draggedItem] = allCategories.splice(draggedIndex, 1);
+          let insertIndex = newIndex;
+          if (draggedIndex < newIndex) {
+            insertIndex = newIndex - 1;
+          }
+          allCategories.splice(insertIndex, 0, draggedItem);
+
+          // Guardar orden
+          saveCategoryOrderDirectly();
+        }
+      }
+
+      document.querySelectorAll('.category-chip').forEach(c => {
+        c.classList.remove('drag-over', 'drop-left', 'drop-right');
+      });
+      activeDraggedChip = null;
+      renderCategories();
+    });
+
+    handleEl.addEventListener('touchcancel', () => {
+      clearTimeout(touchTimeout);
+      if (activeDraggedChip) {
+        chip.classList.remove('dragging');
+        document.querySelectorAll('.category-chip').forEach(c => {
+          c.classList.remove('drag-over', 'drop-left', 'drop-right');
+        });
+        activeDraggedChip = null;
+        renderCategories();
+      }
     });
 
     // Evento de click principal en el chip de categoría
@@ -266,7 +388,7 @@ function renderCategories() {
       });
     }
 
-    // Drag and Drop Event Listeners
+    // Drag and Drop Event Listeners (PC)
     chip.addEventListener('dragstart', (e) => {
       isMouseDownForScroll = false;
       categoriesListEl.classList.remove('grabbing');
@@ -330,25 +452,28 @@ function renderCategories() {
       }
       allCategories.splice(insertIndex, 0, draggedItem);
 
-      // Guardar el orden preferido
-      try {
-        let userId = null;
-        try {
-          const auth = await getAuthUserAndSalt();
-          userId = auth.userId;
-        } catch (_) {}
-        const orderKey = userId ? `category_order_${userId}` : 'category_order_global';
-        const orderIds = allCategories.map(c => c.id_clasificacion);
-        localStorage.setItem(orderKey, JSON.stringify(orderIds));
-      } catch (err) {
-        console.error('Error al guardar el orden:', err);
-      }
-
+      saveCategoryOrderDirectly();
       renderCategories();
     });
 
     categoriesListEl.appendChild(chip);
   });
+}
+
+// Función auxiliar para guardar el orden preferido
+async function saveCategoryOrderDirectly() {
+  try {
+    let userId = null;
+    try {
+      const auth = await getAuthUserAndSalt();
+      userId = auth.userId;
+    } catch (_) {}
+    const orderKey = userId ? `category_order_${userId}` : 'category_order_global';
+    const orderIds = allCategories.map(c => c.id_clasificacion);
+    localStorage.setItem(orderKey, JSON.stringify(orderIds));
+  } catch (err) {
+    console.error('Error al guardar el orden:', err);
+  }
 }
 
 // Variables y lógica para arrastre del mouse (desplazamiento horizontal en PC)
