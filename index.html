@@ -96,27 +96,92 @@
           </div>
         </div>
 
-        <button type="submit" class="btn btn-success btn-block">
+        <button type="submit" class="btn btn-success btn-block" id="btn-register-submit">
           <span>Crear Cuenta</span>
           <i class="ri-user-add-line"></i>
         </button>
+        <p class="auth-hint">
+          <i class="ri-information-line"></i>
+          Te enviaremos un correo de verificación para activar tu cuenta.
+        </p>
 
         <p class="auth-switch">¿Ya tienes cuenta? <a href="#" id="to-login">Inicia Sesión</a></p>
       </form>
 
-      <!-- Pantalla de Confirmación de Email -->
-      <div id="email-confirm-screen" class="auth-form hidden" style="text-align: center; padding: 20px 10px;">
-        <div style="margin-bottom: 20px; font-size: 3rem; color: var(--accent-success, #10b981);">
-          <i class="ri-mail-send-line"></i>
+      <!-- Pantalla de Confirmación de Email (Mejorada) -->
+      <div id="email-confirm-screen" class="auth-form hidden">
+        <div class="email-confirm-content">
+          <!-- Animación del sobre -->
+          <div class="email-anim-container">
+            <div class="email-envelope">
+              <i class="ri-mail-send-line"></i>
+            </div>
+            <div class="email-pulse-ring"></div>
+            <div class="email-pulse-ring email-pulse-ring-delay"></div>
+          </div>
+
+          <h3 class="email-confirm-title">¡Casi listo! Revisa tu correo</h3>
+          
+          <div class="email-confirm-badge">
+            <i class="ri-mail-check-line"></i>
+            <span>Enviado a <strong id="confirm-email-display"></strong></span>
+          </div>
+
+          <!-- Pasos claros -->
+          <div class="email-steps">
+            <div class="email-step">
+              <div class="email-step-number">1</div>
+              <div class="email-step-text">
+                <strong>Abre tu correo electrónico</strong>
+                <span>Revisa la bandeja de entrada del correo que ingresaste</span>
+              </div>
+            </div>
+            <div class="email-step">
+              <div class="email-step-number">2</div>
+              <div class="email-step-text">
+                <strong>Busca el correo de KeyShield</strong>
+                <span>El remitente será <em>noreply@mail.app.supabase.io</em></span>
+              </div>
+            </div>
+            <div class="email-step">
+              <div class="email-step-number">3</div>
+              <div class="email-step-text">
+                <strong>Haz clic en "Confirm your mail"</strong>
+                <span>Esto activará tu cuenta y podrás iniciar sesión</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tip de spam -->
+          <div class="email-spam-tip">
+            <i class="ri-spam-2-line"></i>
+            <span>¿No lo encuentras? Revisa la carpeta de <strong>spam</strong> o <strong>correo no deseado</strong>.</span>
+          </div>
+
+          <!-- Botones de acción rápida -->
+          <div class="email-quick-links">
+            <a href="https://mail.google.com" target="_blank" rel="noopener" class="btn-email-provider">
+              <i class="ri-google-fill"></i> Abrir Gmail
+            </a>
+            <a href="https://outlook.live.com" target="_blank" rel="noopener" class="btn-email-provider">
+              <i class="ri-microsoft-fill"></i> Abrir Outlook
+            </a>
+            <a href="https://mail.yahoo.com" target="_blank" rel="noopener" class="btn-email-provider">
+              <i class="ri-yahoo-fill"></i> Yahoo
+            </a>
+          </div>
+
+          <div class="email-confirm-actions">
+            <button id="btn-back-to-login" class="btn btn-primary btn-block">
+              <i class="ri-login-box-line"></i>
+              <span>Ya verifiqué, ir a Iniciar Sesión</span>
+            </button>
+            <button id="btn-back-to-register" class="btn btn-secondary-outline btn-block">
+              <i class="ri-arrow-left-line"></i>
+              <span>Volver al registro</span>
+            </button>
+          </div>
         </div>
-        <h3 style="margin-bottom: 10px; font-size: 1.25rem; font-weight: 600;">¡Revisa tu bandeja de entrada!</h3>
-        <p style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px;">
-          Hemos enviado un correo de verificación a <strong id="confirm-email-display" style="color: var(--text-color);"></strong>. Abre ese correo y haz clic en el enlace de confirmación para activar tu cuenta.
-        </p>
-        <button id="btn-back-to-register" class="btn btn-secondary-outline btn-block">
-          <i class="ri-arrow-left-line"></i>
-          <span>Volver al registro</span>
-        </button>
       </div>
     </div>
   </main>

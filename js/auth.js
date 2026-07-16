@@ -55,6 +55,12 @@ registerForm.addEventListener('submit', async (e) => {
     return;
   }
 
+  // Loading state en el botón de registro
+  const submitBtn = document.getElementById('btn-register-submit');
+  const originalContent = submitBtn.innerHTML;
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<i class="ri-loader-4-line" style="animation: spin 1s linear infinite;"></i> <span>Creando cuenta...</span>';
+
   try {
     // Generar un salt único para derivación de claves en este usuario
     const salt = generateSalt();
@@ -81,6 +87,9 @@ registerForm.addEventListener('submit', async (e) => {
     registerForm.reset();
   } catch (error) {
     showToast(error.message || 'Error en el registro');
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = originalContent;
   }
 });
 
@@ -114,6 +123,15 @@ document.getElementById('btn-back-to-register').addEventListener('click', () => 
   document.getElementById('email-confirm-screen').classList.add('hidden');
   registerForm.classList.remove('hidden');
   document.getElementById('auth-subtitle').textContent = 'Crea tu cuenta de almacenamiento cifrado';
+});
+
+// Botón "Ya verifiqué, ir a Iniciar Sesión"
+document.getElementById('btn-back-to-login').addEventListener('click', () => {
+  document.getElementById('email-confirm-screen').classList.add('hidden');
+  loginForm.classList.remove('hidden');
+  registerForm.classList.add('hidden');
+  document.getElementById('auth-subtitle').textContent = 'Guarda y organiza tus accesos de forma segura';
+  showToast('¡Genial! Ahora inicia sesión con tu cuenta verificada.');
 });
 
 // Cierre de Sesión

@@ -118,6 +118,52 @@ function updateConnectionBadge() {
 // SECCIÓN DE CATEGORÍAS
 // ==========================================
 
+// Helper para ordenar las categorías de acuerdo al orden guardado
+async function sortCategories(categories) {
+  let userId = null;
+  try {
+    const { userId: uid } = await getAuthUserAndSalt();
+    userId = uid;
+  } catch (_) {}
+  
+  const orderKey = userId ? `category_order_${userId}` : 'category_order_global';
+  const savedOrderStr = localStorage.getItem(orderKey);
+  
+  if (savedOrderStr) {
+    try {
+      const savedOrder = JSON.parse(savedOrderStr);
+      const orderMap = {};
+      savedOrder.forEach((id, index) => {
+        orderMap[id] = index;
+      });
+      
+      return categories.sort((a, b) => {
+        const aIndex = orderMap[a.id_clasificacion];
+        const bIndex = orderMap[b.id_clasificacion];
+        if (aIndex !== undefined && bIndex !== undefined) {
+          return aIndex - bIndex;
+        }
+        if (aIndex !== undefined) return -1;
+        if (bIndex !== undefined) return 1;
+        
+        // Orden por defecto
+        if (a.id_usuario === null && b.id_usuario !== null) return -1;
+        if (a.id_usuario !== null && b.id_usuario === null) return 1;
+        return a.nombre.localeCompare(b.nombre);
+      });
+    } catch (e) {
+      console.error('Error al parsear el orden de categorías:', e);
+    }
+  }
+  
+  // Orden por defecto
+  return categories.sort((a, b) => {
+    if (a.id_usuario === null && b.id_usuario !== null) return -1;
+    if (a.id_usuario !== null && b.id_usuario === null) return 1;
+    return a.nombre.localeCompare(b.nombre);
+  });
+}
+
 async function fetchCategories() {
   if (navigator.onLine) {
     try {
@@ -129,12 +175,7 @@ async function fetchCategories() {
       if (error) throw error;
       
       const rawCategories = data || [];
-      // Ordenar: primero las globales (id_usuario === null) y luego las de usuario por orden alfabético
-      allCategories = rawCategories.sort((a, b) => {
-        if (a.id_usuario === null && b.id_usuario !== null) return -1;
-        if (a.id_usuario !== null && b.id_usuario === null) return 1;
-        return a.nombre.localeCompare(b.nombre);
-      });
+      allCategories = await sortCategories(rawCategories);
       
       // Guardar copia local en IndexedDB
       if (window.offlineDB) {
@@ -143,15 +184,12 @@ async function fetchCategories() {
     } catch (err) {
       console.error('Error al obtener clasificaciones online:', err);
     }
+  } else {
     // Si está offline, recuperar de IndexedDB
     if (window.offlineDB) {
       try {
         const rawCategories = await window.offlineDB.getClasificaciones();
-        allCategories = rawCategories.sort((a, b) => {
-          if (a.id_usuario === null && b.id_usuario !== null) return -1;
-          if (a.id_usuario !== null && b.id_usuario === null) return 1;
-          return a.nombre.localeCompare(b.nombre);
-        });
+        allCategories = await sortCategories(rawCategories);
       } catch (err) {
         console.error('Error al leer clasificaciones offline:', err);
       }
@@ -169,7 +207,8 @@ function renderCategories() {
   const allChip = document.createElement('div');
   allChip.className = `category-chip ${selectedCategoryId === null ? 'active' : ''}`;
   allChip.innerHTML = `<i class="ri-apps-2-line"></i> <span>Todos</span>`;
-  allChip.addEventListener('click', () => {
+  allChip.addEventListener('click', (e) => {
+    if (isDraggingScroll) return;
     selectedCategoryId = null;
     renderCategories();
     filterAndRenderAccounts();
@@ -181,6 +220,8 @@ function renderCategories() {
     const chip = document.createElement('div');
     chip.className = `category-chip ${selectedCategoryId === cat.id_clasificacion ? 'active' : ''}`;
     chip.style.borderColor = cat.color;
+    chip.dataset.id = cat.id_clasificacion;
+    chip.draggable = true;
     
     // Si la categoría pertenece al usuario (no es global), añadir botón de eliminar
     const isCustom = cat.id_usuario !== null;
@@ -194,7 +235,8 @@ function renderCategories() {
     `;
 
     // Evento de click principal en el chip de categoría
-    chip.querySelector('.category-chip-content').addEventListener('click', () => {
+    chip.querySelector('.category-chip-content').addEventListener('click', (e) => {
+      if (isDraggingScroll) return;
       selectedCategoryId = cat.id_clasificacion;
       renderCategories();
       filterAndRenderAccounts();
@@ -210,9 +252,133 @@ function renderCategories() {
       });
     }
 
+    // Drag and Drop Event Listeners
+    chip.addEventListener('dragstart', (e) => {
+      isMouseDownForScroll = false;
+      categoriesListEl.classList.remove('grabbing');
+      
+      chip.classList.add('dragging');
+      e.dataTransfer.setData('text/plain', cat.id_clasificacion);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    chip.addEventListener('dragend', () => {
+      chip.classList.remove('dragging');
+      document.querySelectorAll('.category-chip').forEach(c => {
+        c.classList.remove('drag-over', 'drop-left', 'drop-right');
+      });
+    });
+
+    chip.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+
+      const rect = chip.getBoundingClientRect();
+      const midpoint = rect.left + rect.width / 2;
+      if (e.clientX < midpoint) {
+        chip.classList.add('drop-left');
+        chip.classList.remove('drop-right');
+      } else {
+        chip.classList.add('drop-right');
+        chip.classList.remove('drop-left');
+      }
+      chip.classList.add('drag-over');
+    });
+
+    chip.addEventListener('dragleave', () => {
+      chip.classList.remove('drag-over', 'drop-left', 'drop-right');
+    });
+
+    chip.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      chip.classList.remove('drag-over', 'drop-left', 'drop-right');
+      const draggedId = parseInt(e.dataTransfer.getData('text/plain'));
+      if (isNaN(draggedId) || draggedId === cat.id_clasificacion) return;
+
+      const draggedIndex = allCategories.findIndex(c => c.id_clasificacion === draggedId);
+      const targetIndex = allCategories.findIndex(c => c.id_clasificacion === cat.id_clasificacion);
+
+      if (draggedIndex === -1 || targetIndex === -1) return;
+
+      const rect = chip.getBoundingClientRect();
+      const midpoint = rect.left + rect.width / 2;
+      let newIndex = targetIndex;
+      if (e.clientX >= midpoint) {
+        newIndex = targetIndex + 1;
+      }
+
+      // Reorder array
+      const [draggedItem] = allCategories.splice(draggedIndex, 1);
+      let insertIndex = newIndex;
+      if (draggedIndex < newIndex) {
+        insertIndex = newIndex - 1;
+      }
+      allCategories.splice(insertIndex, 0, draggedItem);
+
+      // Guardar el orden preferido
+      try {
+        let userId = null;
+        try {
+          const auth = await getAuthUserAndSalt();
+          userId = auth.userId;
+        } catch (_) {}
+        const orderKey = userId ? `category_order_${userId}` : 'category_order_global';
+        const orderIds = allCategories.map(c => c.id_clasificacion);
+        localStorage.setItem(orderKey, JSON.stringify(orderIds));
+      } catch (err) {
+        console.error('Error al guardar el orden:', err);
+      }
+
+      renderCategories();
+    });
+
     categoriesListEl.appendChild(chip);
   });
 }
+
+// Variables y lógica para arrastre del mouse (desplazamiento horizontal en PC)
+let isMouseDownForScroll = false;
+let startScrollX;
+let scrollLeftVal;
+let isDraggingScroll = false;
+
+categoriesListEl.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
+  if (e.target.closest('.btn-delete-cat')) return;
+
+  isMouseDownForScroll = true;
+  isDraggingScroll = false;
+  startScrollX = e.pageX - categoriesListEl.offsetLeft;
+  scrollLeftVal = categoriesListEl.scrollLeft;
+});
+
+categoriesListEl.addEventListener('mouseleave', () => {
+  isMouseDownForScroll = false;
+  categoriesListEl.classList.remove('grabbing');
+});
+
+categoriesListEl.addEventListener('mouseup', () => {
+  isMouseDownForScroll = false;
+  setTimeout(() => {
+    isDraggingScroll = false;
+  }, 50);
+  categoriesListEl.classList.remove('grabbing');
+});
+
+categoriesListEl.addEventListener('mousemove', (e) => {
+  if (!isMouseDownForScroll) return;
+  e.preventDefault();
+
+  const x = e.pageX - categoriesListEl.offsetLeft;
+  const walk = (x - startScrollX) * 1.5;
+
+  if (Math.abs(x - startScrollX) > 5) {
+    isDraggingScroll = true;
+    categoriesListEl.classList.add('grabbing');
+  }
+
+  categoriesListEl.scrollLeft = scrollLeftVal - walk;
+});
 
 // Eliminar categoría
 async function deleteCategory(id) {
