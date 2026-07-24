@@ -1212,13 +1212,15 @@ textarea:focus {
 }
 
 .amplify-logo-inline {
-  height: 14px;
+  height: 16px;
+  width: 93px; /* Relación de aspecto correcta del viewBox 512x88 */
   display: flex;
   align-items: center;
 }
 
 .amplify-logotype {
   height: 100%;
+  width: 100%;
   display: block;
 }
 
