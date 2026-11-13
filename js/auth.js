@@ -187,21 +187,44 @@ document.getElementById('reauth-form').addEventListener('submit', async (e) => {
       throw new Error('No hay sesión de Supabase activa. Inicie sesión de nuevo.');
     }
 
-    const isGoogleUser = session.user.app_metadata?.provider === 'google' || 
-                         session.user.identities?.some(id => id.provider === 'google');
+    const salt = session.user.user_metadata?.salt;
+    const vaultCheck = session.user.user_metadata?.vault_check;
 
-    if (!isGoogleUser) {
-      // Para usuarios registrados originalmente con contraseña, validamos contra Supabase
-      const { error } = await window.sb.auth.signInWithPassword({
-        email: session.user.email,
-        password: password
-      });
-      if (error) throw new Error('Contraseña incorrecta.');
+    if (vaultCheck && salt) {
+      // 1. Verificación criptográfica con vault_check
+      const computedHash = await window.cryptoClient.hashVaultPassword(password, salt);
+      if (computedHash !== vaultCheck) {
+        throw new Error('Contraseña de bóveda incorrecta.');
+      }
     } else {
-      // Para usuarios de Google, si la contraseña maestra ya tenía hash guardado lo validamos;
-      // si es su primera vez estableciéndola, se almacena
-      if (password.length < 6) {
-        throw new Error('La contraseña de bóveda debe tener al menos 6 caracteres.');
+      // 2. Si no tiene vault_check, intentamos validar con credenciales de Supabase (usuarios antiguos)
+      let isValidPassword = false;
+      try {
+        const { error } = await window.sb.auth.signInWithPassword({
+          email: session.user.email,
+          password: password
+        });
+        if (!error) isValidPassword = true;
+      } catch (_) {}
+
+      // Si es un usuario nuevo de Google que apenas está creando su contraseña de bóveda
+      const isGoogleUser = session.user.app_metadata?.provider === 'google' || 
+                           session.user.identities?.some(id => id.provider === 'google');
+
+      if (!isValidPassword && !isGoogleUser) {
+        throw new Error('Contraseña de bóveda incorrecta.');
+      }
+
+      if (isGoogleUser && !isValidPassword && password.length < 8) {
+        throw new Error('La contraseña de bóveda debe tener al menos 8 caracteres.');
+      }
+
+      // Inicializar y guardar el vault_check en los metadatos para futuras validaciones estrictas
+      if (salt) {
+        const newVaultHash = await window.cryptoClient.hashVaultPassword(password, salt);
+        await window.sb.auth.updateUser({
+          data: { vault_check: newVaultHash }
+        });
       }
     }
 

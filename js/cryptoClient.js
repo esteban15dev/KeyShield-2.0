@@ -119,7 +119,19 @@ async function decryptPasswordOffline(encryptedHex, ivHex, userSalt) {
   }
 }
 
+/**
+ * Genera un verificador criptográfico SHA-256 de la contraseña maestra y su salt
+ * Permite validar contraseñas de bóveda sin almacenar la contraseña en claro
+ */
+async function hashVaultPassword(password, salt) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password + ':' + salt);
+  const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+  return arrayBufferToHex(hashBuffer);
+}
+
 window.cryptoClient = {
   encryptPasswordLocal,
-  decryptPasswordOffline
+  decryptPasswordOffline,
+  hashVaultPassword
 };
