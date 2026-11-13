@@ -189,53 +189,61 @@ document.getElementById('reauth-form').addEventListener('submit', async (e) => {
 
     const salt = session.user.user_metadata?.salt;
     const vaultCheck = session.user.user_metadata?.vault_check;
+    const isGoogleUser = session.user.app_metadata?.provider === 'google' ||
+                         session.user.identities?.some(id => id.provider === 'google');
 
     if (vaultCheck && salt) {
-      // 1. Verificación criptográfica con vault_check
+      // === CASO 1: Usuario con vault_check definido → verificar criptográficamente ===
       const computedHash = await window.cryptoClient.hashVaultPassword(password, salt);
       if (computedHash !== vaultCheck) {
         throw new Error('Contraseña de bóveda incorrecta.');
       }
-    } else {
-      // 2. Si no tiene vault_check, intentamos validar con credenciales de Supabase (usuarios antiguos)
-      let isValidPassword = false;
-      try {
-        const { error } = await window.sb.auth.signInWithPassword({
-          email: session.user.email,
-          password: password
-        });
-        if (!error) isValidPassword = true;
-      } catch (_) {}
 
-      // Si es un usuario nuevo de Google que apenas está creando su contraseña de bóveda
-      const isGoogleUser = session.user.app_metadata?.provider === 'google' || 
-                           session.user.identities?.some(id => id.provider === 'google');
+    } else if (isGoogleUser) {
+      // === CASO 2: Usuario de Google sin vault_check → está creando su bóveda por primera vez ===
+      const confirmInput = document.getElementById('reauth-password-confirm');
+      const confirm = confirmInput.value;
 
-      if (!isValidPassword && !isGoogleUser) {
-        throw new Error('Contraseña de bóveda incorrecta.');
-      }
-
-      if (isGoogleUser && !isValidPassword && password.length < 8) {
+      if (password.length < 8) {
         throw new Error('La contraseña de bóveda debe tener al menos 8 caracteres.');
       }
+      if (!confirm) {
+        throw new Error('Por favor confirma tu contraseña de bóveda.');
+      }
+      if (password !== confirm) {
+        throw new Error('Las contraseñas no coinciden. Intenta de nuevo.');
+      }
 
-      // Inicializar y guardar el vault_check en los metadatos para futuras validaciones estrictas
+      // Guardar hash del vault en Supabase
       if (salt) {
         const newVaultHash = await window.cryptoClient.hashVaultPassword(password, salt);
-        await window.sb.auth.updateUser({
-          data: { vault_check: newVaultHash }
-        });
+        await window.sb.auth.updateUser({ data: { vault_check: newVaultHash } });
+      }
+
+    } else {
+      // === CASO 3: Usuario antiguo con email+password, sin vault_check aún ===
+      const { error } = await window.sb.auth.signInWithPassword({
+        email: session.user.email,
+        password: password
+      });
+      if (error) throw new Error('Contraseña incorrecta.');
+
+      // Migrar: guardar vault_check para futuros accesos
+      if (salt) {
+        const newVaultHash = await window.cryptoClient.hashVaultPassword(password, salt);
+        await window.sb.auth.updateUser({ data: { vault_check: newVaultHash } });
       }
     }
 
-    // Contraseña válida, guardar en sessionStorage para cifrado/descifrado en memoria
+    // Contraseña válida: guardar en sessionStorage para cifrado/descifrado en memoria
     sessionStorage.setItem('keyshield_master', password);
     document.getElementById('reauth-password').value = '';
+    const confirmField = document.getElementById('reauth-password-confirm');
+    if (confirmField) confirmField.value = '';
     document.getElementById('reauth-modal').classList.add('hidden');
-    
+
     showToast('Bóveda desbloqueada con éxito.');
-    
-    // Inicializar dashboard
+
     if (window.initializeDashboard) {
       window.initializeDashboard();
     }
@@ -249,7 +257,7 @@ async function checkAuth() {
   const { data: { session } } = await window.sb.auth.getSession();
   
   if (session && session.user) {
-    // Si es un usuario que ingresó con Google y aún no tiene salt asignado, se lo generamos
+    // Si el usuario no tiene salt aún (usuario de Google nuevo), lo generamos
     if (!session.user.user_metadata?.salt) {
       const generatedSalt = generateSalt();
       const friendlyName = session.user.user_metadata?.full_name || 
@@ -269,13 +277,34 @@ async function checkAuth() {
     const userMetadata = session.user.user_metadata || {};
     document.getElementById('user-display').textContent = userMetadata.nombre_usuario || userMetadata.full_name || session.user.email;
     
-    // Verificar si la contraseña maestra se perdió en sessionStorage (pestaña recargada, app cerrada)
     const masterPassword = sessionStorage.getItem('keyshield_master');
     if (!masterPassword) {
-      // Mostrar el modal de re-autenticación rápida
+      // Adaptar el modal según si ya tiene vault_check o está creando por primera vez
+      const hasVaultCheck = !!session.user.user_metadata?.vault_check;
+      const isGoogleUser = session.user.app_metadata?.provider === 'google' ||
+                           session.user.identities?.some(id => id.provider === 'google');
+      const confirmGroup = document.getElementById('reauth-confirm-group');
+      const reauthTitle = document.getElementById('reauth-title');
+      const reauthDesc = document.getElementById('reauth-desc');
+
+      if (isGoogleUser && !hasVaultCheck) {
+        // Primera vez: crear contraseña de bóveda con confirmación
+        reauthTitle.textContent = 'Crea tu contraseña de bóveda';
+        reauthDesc.textContent = 'Como usas Google para iniciar sesión, necesitas crear una contraseña de bóveda para cifrar y proteger tus credenciales guardadas. Recuérdala bien, no se puede recuperar.';
+        confirmGroup.classList.remove('hidden');
+        document.getElementById('reauth-label').textContent = 'Nueva Contraseña de Bóveda';
+        document.getElementById('reauth-password').placeholder = 'Mínimo 8 caracteres';
+      } else {
+        // Regreso: desbloquear bóveda existente
+        reauthTitle.textContent = 'Bienvenido de vuelta';
+        reauthDesc.textContent = 'Por seguridad, confirma tu contraseña maestra para descifrar tus credenciales.';
+        confirmGroup.classList.add('hidden');
+        document.getElementById('reauth-label').textContent = 'Contraseña Maestra';
+        document.getElementById('reauth-password').placeholder = '••••••••••••';
+      }
+
       document.getElementById('reauth-modal').classList.remove('hidden');
     } else {
-      // Todo listo, disparar dashboard
       if (window.initializeDashboard) {
         window.initializeDashboard();
       }
@@ -283,7 +312,6 @@ async function checkAuth() {
   } else {
     appContainer.classList.add('hidden');
     authContainer.classList.remove('hidden');
-    // Asegurar ocultamiento de pantallas adicionales
     document.getElementById('email-confirm-screen').classList.add('hidden');
   }
 }

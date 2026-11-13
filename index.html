@@ -447,18 +447,30 @@
   <div id="reauth-modal" class="modal hidden">
     <div class="modal-content modal-content-sm">
       <div class="modal-header">
-        <h3>Bienvenido de vuelta</h3>
+        <h3 id="reauth-title">Bienvenido de vuelta</h3>
       </div>
       <form id="reauth-form" class="modal-form">
-        <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 15px;">
+        <p id="reauth-desc" style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 15px;">
           Por seguridad, confirma tu contraseña maestra para descifrar tus credenciales.
         </p>
         <div class="input-group">
-          <label for="reauth-password">Contraseña Maestra</label>
+          <label for="reauth-password" id="reauth-label">Contraseña Maestra</label>
           <div class="input-wrapper">
             <i class="ri-lock-2-line"></i>
             <input type="password" id="reauth-password" placeholder="••••••••••••" required autocomplete="current-password">
             <button type="button" class="btn-auth-eye" data-target="reauth-password" title="Mostrar contraseña">
+              <i class="ri-eye-line"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Campo de confirmación solo para primer registro de bóveda -->
+        <div class="input-group hidden" id="reauth-confirm-group">
+          <label for="reauth-password-confirm">Confirmar Contraseña de Bóveda</label>
+          <div class="input-wrapper">
+            <i class="ri-lock-2-line"></i>
+            <input type="password" id="reauth-password-confirm" placeholder="••••••••••••" autocomplete="new-password">
+            <button type="button" class="btn-auth-eye" data-target="reauth-password-confirm" title="Mostrar contraseña">
               <i class="ri-eye-line"></i>
             </button>
           </div>
