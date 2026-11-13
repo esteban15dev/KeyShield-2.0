@@ -1,4 +1,4 @@
-const CACHE_NAME = 'keyshield-cache-v9';
+const CACHE_NAME = 'keyshield-cache-v10';
 const ASSETS_TO_CACHE = [
   './',
   'index.html',

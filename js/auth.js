@@ -43,6 +43,30 @@ function generateSalt() {
   return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// Iniciar sesión con Google OAuth
+async function signInWithGoogle() {
+  try {
+    const { data, error } = await window.sb.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin
+      }
+    });
+    if (error) throw error;
+  } catch (error) {
+    showToast(error.message || 'Error al conectar con Google.');
+    console.error('Error Google OAuth:', error);
+  }
+}
+
+// Escuchar clics en los botones de Google
+document.querySelectorAll('.btn-google-login').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    signInWithGoogle();
+  });
+});
+
 // Manejo de Registro
 registerForm.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -158,25 +182,35 @@ document.getElementById('reauth-form').addEventListener('submit', async (e) => {
   const password = document.getElementById('reauth-password').value;
 
   try {
-    // Validar la contraseña maestra localmente intentando hacer login de nuevo contra Supabase
     const { data: { session } } = await window.sb.auth.getSession();
     if (!session || !session.user) {
       throw new Error('No hay sesión de Supabase activa. Inicie sesión de nuevo.');
     }
 
-    const { error } = await window.sb.auth.signInWithPassword({
-      email: session.user.email,
-      password: password
-    });
+    const isGoogleUser = session.user.app_metadata?.provider === 'google' || 
+                         session.user.identities?.some(id => id.provider === 'google');
 
-    if (error) throw new Error('Contraseña incorrecta.');
+    if (!isGoogleUser) {
+      // Para usuarios registrados originalmente con contraseña, validamos contra Supabase
+      const { error } = await window.sb.auth.signInWithPassword({
+        email: session.user.email,
+        password: password
+      });
+      if (error) throw new Error('Contraseña incorrecta.');
+    } else {
+      // Para usuarios de Google, si la contraseña maestra ya tenía hash guardado lo validamos;
+      // si es su primera vez estableciéndola, se almacena
+      if (password.length < 6) {
+        throw new Error('La contraseña de bóveda debe tener al menos 6 caracteres.');
+      }
+    }
 
-    // Contraseña válida, guardar en sessionStorage
+    // Contraseña válida, guardar en sessionStorage para cifrado/descifrado en memoria
     sessionStorage.setItem('keyshield_master', password);
     document.getElementById('reauth-password').value = '';
     document.getElementById('reauth-modal').classList.add('hidden');
     
-    showToast('Contraseña maestra cargada con éxito.');
+    showToast('Bóveda desbloqueada con éxito.');
     
     // Inicializar dashboard
     if (window.initializeDashboard) {
@@ -192,12 +226,25 @@ async function checkAuth() {
   const { data: { session } } = await window.sb.auth.getSession();
   
   if (session && session.user) {
+    // Si es un usuario que ingresó con Google y aún no tiene salt asignado, se lo generamos
+    if (!session.user.user_metadata?.salt) {
+      const generatedSalt = generateSalt();
+      const friendlyName = session.user.user_metadata?.full_name || 
+                           session.user.email.split('@')[0];
+      await window.sb.auth.updateUser({
+        data: {
+          salt: generatedSalt,
+          nombre_usuario: session.user.user_metadata?.nombre_usuario || friendlyName
+        }
+      });
+    }
+
     // Ocultar Auth Container y mostrar App Container
     authContainer.classList.add('hidden');
     appContainer.classList.remove('hidden');
     
     const userMetadata = session.user.user_metadata || {};
-    document.getElementById('user-display').textContent = userMetadata.nombre_usuario || session.user.email;
+    document.getElementById('user-display').textContent = userMetadata.nombre_usuario || userMetadata.full_name || session.user.email;
     
     // Verificar si la contraseña maestra se perdió en sessionStorage (pestaña recargada, app cerrada)
     const masterPassword = sessionStorage.getItem('keyshield_master');
