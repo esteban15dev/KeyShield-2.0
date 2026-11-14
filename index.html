@@ -79,6 +79,12 @@
         </button>
 
         <p class="auth-switch">¿No tienes cuenta? <a href="#" id="to-register">Regístrate gratis</a></p>
+
+        <!-- Botón sutil de protocolos de seguridad -->
+        <button type="button" id="btn-security-info" class="btn-security-info" title="Ver protocolos de seguridad">
+          <i class="ri-shield-check-line"></i>
+          <span>¿Cómo protegemos tus datos?</span>
+        </button>
       </form>
 
       <!-- Formulario de Registro -->
@@ -481,6 +487,159 @@
           <button type="button" id="btn-reauth-logout" class="btn btn-secondary-outline btn-block">Cerrar Sesión</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: PROTOCOLOS DE SEGURIDAD ================= -->
+  <div id="security-modal" class="modal hidden">
+    <div class="modal-content modal-security">
+      <div class="modal-header">
+        <div class="security-modal-title">
+          <i class="ri-shield-keyhole-fill security-title-icon"></i>
+          <h3>Protocolos de Seguridad</h3>
+        </div>
+        <button class="btn-close-security-modal"><i class="ri-close-line"></i></button>
+      </div>
+
+      <div class="security-modal-body">
+
+        <!-- Intro -->
+        <p class="security-intro">
+          KeyShield fue diseñado bajo un modelo de <strong>conocimiento cero</strong>. Aquí te explicamos exactamente qué protege tus datos y qué información existe en el sistema.
+        </p>
+
+        <!-- Sección: Protocolos -->
+        <div class="security-section">
+          <h4 class="security-section-title">
+            <i class="ri-lock-2-line"></i> Cifrado y Protocolos
+          </h4>
+          <div class="security-items">
+            <div class="security-item">
+              <div class="security-item-icon security-icon-green"><i class="ri-key-2-line"></i></div>
+              <div class="security-item-text">
+                <strong>AES-256-CBC</strong>
+                <span>Cifrado estándar militar. Tus contraseñas se cifran en tu dispositivo <em>antes</em> de salir a internet.</span>
+              </div>
+            </div>
+            <div class="security-item">
+              <div class="security-item-icon security-icon-blue"><i class="ri-loop-right-line"></i></div>
+              <div class="security-item-text">
+                <strong>PBKDF2 · 100,000 iteraciones · SHA-256</strong>
+                <span>Tu contraseña maestra se convierte en una clave criptográfica con 100 mil iteraciones, haciéndola resistente a ataques de fuerza bruta.</span>
+              </div>
+            </div>
+            <div class="security-item">
+              <div class="security-item-icon security-icon-purple"><i class="ri-cpu-line"></i></div>
+              <div class="security-item-text">
+                <strong>Web Crypto API (cifrado local)</strong>
+                <span>Todo el cifrado y descifrado ocurre directamente en tu navegador. La clave nunca viaja por la red.</span>
+              </div>
+            </div>
+            <div class="security-item">
+              <div class="security-item-icon security-icon-green"><i class="ri-shield-flash-line"></i></div>
+              <div class="security-item-text">
+                <strong>IV aleatorio por operación</strong>
+                <span>Cada cifrado genera un vector de inicialización único de 16 bytes, garantizando que dos contraseñas iguales produzcan resultados distintos.</span>
+              </div>
+            </div>
+            <div class="security-item">
+              <div class="security-item-icon security-icon-blue"><i class="ri-global-line"></i></div>
+              <div class="security-item-text">
+                <strong>HTTPS / TLS en tránsito</strong>
+                <span>Toda comunicación con el servidor está protegida por cifrado de transporte. Los datos viajan siempre encriptados.</span>
+              </div>
+            </div>
+            <div class="security-item">
+              <div class="security-item-icon security-icon-purple"><i class="ri-database-2-line"></i></div>
+              <div class="security-item-text">
+                <strong>Supabase · RLS (Row Level Security)</strong>
+                <span>Las reglas de base de datos garantizan que cada usuario solo puede acceder a sus propios registros, incluso a nivel de motor de base de datos.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sección: Visible para desarrolladores -->
+        <div class="security-section">
+          <h4 class="security-section-title security-title-yellow">
+            <i class="ri-eye-line"></i> Lo que los desarrolladores <em>sí</em> pueden ver
+          </h4>
+          <div class="security-items">
+            <div class="security-item security-item-warning">
+              <div class="security-item-icon security-icon-yellow"><i class="ri-mail-line"></i></div>
+              <div class="security-item-text">
+                <strong>Correo electrónico</strong>
+                <span>Usado para autenticación e identificar tu cuenta.</span>
+              </div>
+            </div>
+            <div class="security-item security-item-warning">
+              <div class="security-item-icon security-icon-yellow"><i class="ri-user-line"></i></div>
+              <div class="security-item-text">
+                <strong>Nombre de usuario</strong>
+                <span>El nombre visible que registraste en la plataforma.</span>
+              </div>
+            </div>
+            <div class="security-item security-item-warning">
+              <div class="security-item-icon security-icon-yellow"><i class="ri-time-line"></i></div>
+              <div class="security-item-text">
+                <strong>Metadatos de actividad</strong>
+                <span>Fecha de creación de cuenta, última sesión y cantidad de registros guardados.</span>
+              </div>
+            </div>
+            <div class="security-item security-item-warning">
+              <div class="security-item-icon security-icon-yellow"><i class="ri-global-line"></i></div>
+              <div class="security-item-text">
+                <strong>Nombres de servicios y URLs</strong>
+                <span>Los nombres de las plataformas (ej. "Netflix") y sus URLs se guardan sin cifrar como referencia visual.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sección: Invisible incluso para nosotros -->
+        <div class="security-section">
+          <h4 class="security-section-title security-title-green">
+            <i class="ri-eye-off-line"></i> Lo que <em>nadie</em> puede ver (ni nosotros)
+          </h4>
+          <div class="security-items">
+            <div class="security-item security-item-secure">
+              <div class="security-item-icon security-icon-green"><i class="ri-lock-password-line"></i></div>
+              <div class="security-item-text">
+                <strong>Tu contraseña maestra</strong>
+                <span>Nunca se transmite ni almacena. Solo existe en tu sesión local y se usa para derivar la clave de cifrado.</span>
+              </div>
+            </div>
+            <div class="security-item security-item-secure">
+              <div class="security-item-icon security-icon-green"><i class="ri-key-line"></i></div>
+              <div class="security-item-text">
+                <strong>Las contraseñas de tus cuentas</strong>
+                <span>Se almacenan como texto cifrado con AES-256. Sin tu contraseña maestra es matemáticamente imposible descifrarlas.</span>
+              </div>
+            </div>
+            <div class="security-item security-item-secure">
+              <div class="security-item-icon security-icon-green"><i class="ri-file-lock-line"></i></div>
+              <div class="security-item-text">
+                <strong>Notas personales</strong>
+                <span>El contenido de tus notas también viaja y se almacena cifrado con la misma clave derivada.</span>
+              </div>
+            </div>
+            <div class="security-item security-item-secure">
+              <div class="security-item-icon security-icon-green"><i class="ri-fingerprint-line"></i></div>
+              <div class="security-item-text">
+                <strong>Clave criptográfica derivada</strong>
+                <span>La clave AES jamás abandona tu navegador. Se genera en memoria durante la sesión y se descarta al cerrar.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Nota final -->
+        <div class="security-footer-note">
+          <i class="ri-information-line"></i>
+          <span>KeyShield sigue el modelo <strong>Zero-Knowledge</strong>: incluso si nuestra base de datos fuera comprometida, tus contraseñas permanecerían ilegibles sin tu clave maestra.</span>
+        </div>
+
+      </div>
     </div>
   </div>
 

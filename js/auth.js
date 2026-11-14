@@ -21,6 +21,28 @@ const registerForm = document.getElementById('register-form');
 const toRegisterLink = document.getElementById('to-register');
 const toLoginLink = document.getElementById('to-login');
 
+// ================= MODAL DE PROTOCOLOS DE SEGURIDAD =================
+const securityModal = document.getElementById('security-modal');
+const btnSecurityInfo = document.getElementById('btn-security-info');
+const btnCloseSecurityModal = document.querySelector('.btn-close-security-modal');
+
+btnSecurityInfo.addEventListener('click', () => {
+  securityModal.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+});
+
+btnCloseSecurityModal.addEventListener('click', () => {
+  securityModal.classList.add('hidden');
+  document.body.style.overflow = '';
+});
+
+securityModal.addEventListener('click', (e) => {
+  if (e.target === securityModal) {
+    securityModal.classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+});
+
 // Intercambio de pantallas de auth
 toRegisterLink.addEventListener('click', (e) => {
   e.preventDefault();
